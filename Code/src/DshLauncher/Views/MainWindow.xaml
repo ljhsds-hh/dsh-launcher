@@ -1,0 +1,573 @@
+<hc:Window x:Class="DshLauncher.Views.MainWindow"
+           xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+           xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+           xmlns:hc="https://handyorg.github.io/handycontrol"
+           Title="DshLauncher"
+           Width="1220"
+           Height="820"
+           MinWidth="1040"
+           MinHeight="720"
+           WindowStartupLocation="CenterScreen"
+           Background="{StaticResource DsPageBrush}"
+           Foreground="{StaticResource DsTextBrush}"
+           FontFamily="{StaticResource UiFontFamily}"
+           FontSize="12.5"
+           TextOptions.TextFormattingMode="Display"
+           UseLayoutRounding="True"
+           ShowNonClientArea="True"
+           ShowTitle="True"
+           ShowIcon="True"
+           Icon="/Assets/app.ico">
+
+    <!--
+      布局：机身（浅）分三层 —— 顶部 masthead / 中部两栏 / 底部状态条。
+      中栏左边是「工作区 + 流程 + 操作」的白色面板，右边是深色日志控制台。
+      动作层级：整屏只有一个实心主按钮（一键执行），其余一律描边或幽灵，
+      这样视线第一眼永远落在"下一步该干什么"上。
+    -->
+    <Window.Resources>
+        <!-- 流程卡片。序号 01/02/03 是真实执行顺序，左侧色条 = 当前状态。 -->
+        <DataTemplate x:Key="StageCardTemplate">
+            <Border x:Name="Shell"
+                    Margin="0,0,0,6"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Background="{StaticResource DsSurfaceBrush}"
+                    BorderBrush="{StaticResource DsBorderBrush}"
+                    SnapsToDevicePixels="True">
+                <Grid>
+                    <Border x:Name="Strip"
+                            Width="3"
+                            HorizontalAlignment="Left"
+                            CornerRadius="10,0,0,10"
+                            Background="Transparent" />
+                    <Grid Margin="15,8,14,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="Numeral"
+                                   Grid.Column="0"
+                                   Width="26"
+                                   Text="{Binding IndexText}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Top"
+                                   Margin="0,1,0,0"
+                                   Foreground="{StaticResource DsTextFaintBrush}" />
+
+                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                            <TextBlock x:Name="StepName"
+                                       Text="{Binding Name}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="{StaticResource DsTextSecondaryBrush}" />
+                            <TextBlock x:Name="StepCommand"
+                                       Text="{Binding Command}"
+                                       Style="{StaticResource DsMonoText}"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                            <TextBlock x:Name="StateLabel"
+                                       Text="{Binding StateText}"
+                                       FontSize="11.5"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Right"
+                                       Foreground="{StaticResource DsTextMutedBrush}" />
+                            <TextBlock x:Name="ElapsedLabel"
+                                       Text="{Binding Elapsed}"
+                                       FontFamily="{StaticResource MonoFontFamily}"
+                                       FontSize="11"
+                                       HorizontalAlignment="Right"
+                                       Margin="0,2,0,0"
+                                       Foreground="{StaticResource DsTextMutedBrush}" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding State}" Value="Running">
+                    <Setter TargetName="Strip" Property="Background" Value="{StaticResource DsAccentLineBrush}" />
+                    <Setter TargetName="Shell" Property="Background" Value="#F6F8FF" />
+                    <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource DsAccentBorderBrush}" />
+                    <Setter TargetName="Numeral" Property="Foreground" Value="{StaticResource DsAccentBrush}" />
+                    <Setter TargetName="StepName" Property="Foreground" Value="{StaticResource DsTextBrush}" />
+                    <Setter TargetName="StateLabel" Property="Foreground" Value="{StaticResource DsAccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Succeeded">
+                    <Setter TargetName="Strip" Property="Background" Value="{StaticResource DsSuccessBrush}" />
+                    <Setter TargetName="Numeral" Property="Foreground" Value="{StaticResource DsSuccessBrush}" />
+                    <Setter TargetName="StepName" Property="Foreground" Value="{StaticResource DsTextBrush}" />
+                    <Setter TargetName="StateLabel" Property="Foreground" Value="{StaticResource DsSuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Failed">
+                    <Setter TargetName="Strip" Property="Background" Value="{StaticResource DsDangerBrush}" />
+                    <Setter TargetName="Shell" Property="Background" Value="{StaticResource DsDangerSoftBrush}" />
+                    <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource DsDangerBorderBrush}" />
+                    <Setter TargetName="Numeral" Property="Foreground" Value="{StaticResource DsDangerBrush}" />
+                    <Setter TargetName="StepName" Property="Foreground" Value="{StaticResource DsTextBrush}" />
+                    <Setter TargetName="StateLabel" Property="Foreground" Value="{StaticResource DsDangerBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Cancelled">
+                    <Setter TargetName="Numeral" Property="Foreground" Value="{StaticResource DsTextMutedBrush}" />
+                    <Setter TargetName="StateLabel" Property="Foreground" Value="{StaticResource DsTextMutedBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ══ masthead ═════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource DsSurfaceBrush}"
+                BorderBrush="{StaticResource DsBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="20,0">
+            <Grid Height="64">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 品牌标记：换成真正的 logo（蓝砖 + 三段向上推进 = 清理 → 构建 → 启动） -->
+                <Image Grid.Column="0"
+                       Width="34"
+                       Height="34"
+                       Margin="0,0,12,0"
+                       VerticalAlignment="Center"
+                       Source="/Assets/logo.png"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       ToolTip="DshLauncher · DeepSeek Harness 启动器" />
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <TextBlock Style="{StaticResource DsBrandTitle}" Text="DeepSeek Harness 启动器" />
+                    <TextBlock Style="{StaticResource DsBrandSub}">
+                        <!-- Run.Text 默认是 TwoWay 绑定，这里必须显式 OneWay：
+                             Version 是只读属性，TwoWay 会在 Show() 里直接抛
+                             InvalidOperationException，窗口变空白（实测踩过）。 -->
+                        <Run Text="DshLauncher v" /><Run Text="{Binding Version, Mode=OneWay}" /><Run Text=" · 选一次目录，之后点按钮就行" />
+                    </TextBlock>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="打开浏览器" Style="{StaticResource DsButtonGhost}"
+                            Command="{Binding OpenBrowserCommand}"
+                            ToolTip="用默认浏览器打开服务地址" />
+                    <Button Content="配置文件" Style="{StaticResource DsButtonGhost}" Margin="2,0,0,0"
+                            Command="{Binding OpenConfigFileCommand}">
+                        <Button.ToolTip>
+                            <StackPanel>
+                                <TextBlock Text="本工具自己的配置，打开时会把这个文件选中：" />
+                                <TextBlock Text="{Binding ConfigFilePath}" FontFamily="{StaticResource MonoFontFamily}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap" MaxWidth="460" />
+                            </StackPanel>
+                        </Button.ToolTip>
+                    </Button>
+                    <Button Content="日志目录" Style="{StaticResource DsButtonGhost}" Margin="2,0,0,0"
+                            Command="{Binding OpenLogFolderCommand}">
+                        <Button.ToolTip>
+                            <StackPanel>
+                                <TextBlock Text="本工具的日志目录（一次运行一个文件，只留最近 14 个）：" />
+                                <TextBlock Text="{Binding LogDirectory}" FontFamily="{StaticResource MonoFontFamily}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap" MaxWidth="460" />
+                            </StackPanel>
+                        </Button.ToolTip>
+                    </Button>
+                    <Button Content="设置" Style="{StaticResource DsButtonGhost}" Margin="2,0,0,0"
+                            Click="OnSettingsClick"
+                            ToolTip="命令、服务与日志的行为都在这里调" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══ 主体 ═════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1" Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="376" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ── 左栏：工作区 / 流程 / 操作 ─────────────────────────────── -->
+            <Border Grid.Column="0"
+                    Background="{StaticResource DsSurfaceBrush}"
+                    BorderBrush="{StaticResource DsBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="18">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- 工作区 -->
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Style="{StaticResource DsSectionLabel}" Text="工作区" />
+
+                        <hc:TextBox Height="32"
+                                    Padding="10,0"
+                                    VerticalContentAlignment="Center"
+                                    Text="{Binding WorkspacePath, UpdateSourceTrigger=PropertyChanged}"
+                                    hc:InfoElement.Placeholder="选择 DeepSeek Harness 仓库目录" />
+
+                        <!-- 校验结论直接摆在输入框下面，不用去日志里翻 -->
+                        <TextBlock Margin="0,8,0,0" FontSize="11.5" FontWeight="SemiBold">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="— 尚未校验" />
+                                    <Setter Property="Foreground" Value="{StaticResource DsTextMutedBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding WorkspaceState}" Value="Valid">
+                                            <Setter Property="Text" Value="✓ 目录校验通过" />
+                                            <Setter Property="Foreground" Value="{StaticResource DsSuccessBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding WorkspaceState}" Value="Invalid">
+                                            <Setter Property="Text" Value="✕ 目录校验未通过" />
+                                            <Setter Property="Foreground" Value="{StaticResource DsDangerBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Style="{StaticResource DsHintText}" Margin="0,4,0,0"
+                                   Text="{Binding WorkspaceDetail}" />
+
+                        <!--
+                          这两个按钮最容易被看串，所以用文案 + ToolTip 把"作用于哪个目录"说死：
+                          「选择目录…」= 弹系统目录选择框；「打开目录」= 在资源管理器里打开
+                          **当前工作目录**（ToolTip 直接把那个路径显示出来）。
+                          右上角那几个才是本工具自己的目录。
+                        -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="选择目录…" Style="{StaticResource DsButtonSecondary}"
+                                    Height="32" Command="{Binding BrowseWorkspaceCommand}">
+                                <Button.ToolTip>
+                                    <StackPanel>
+                                        <TextBlock Text="弹出系统目录选择框，挑一个 DeepSeek Harness 仓库目录" />
+                                    </StackPanel>
+                                </Button.ToolTip>
+                            </Button>
+                            <Button Grid.Column="2" Content="打开目录" Style="{StaticResource DsButtonSecondary}"
+                                    Height="32" Command="{Binding OpenWorkspaceFolderCommand}">
+                                <Button.ToolTip>
+                                    <StackPanel>
+                                        <TextBlock Text="在资源管理器里打开【当前工作目录】，也就是：" />
+                                        <TextBlock Text="{Binding WorkspacePath}" FontFamily="{StaticResource MonoFontFamily}"
+                                                   Margin="0,3,0,0" TextWrapping="Wrap" MaxWidth="460" />
+                                    </StackPanel>
+                                </Button.ToolTip>
+                            </Button>
+                            <Button Grid.Column="4" Content="检测" Style="{StaticResource DsButtonSecondary}"
+                                    Height="32" Command="{Binding VerifyWorkspaceCommand}">
+                                <Button.ToolTip>
+                                    <StackPanel>
+                                        <TextBlock Text="校验当前目录是不是 DeepSeek Harness 仓库，缺什么会写在下面和日志里" />
+                                    </StackPanel>
+                                </Button.ToolTip>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Grid.Row="1" Style="{StaticResource DsHairline}" Margin="0,14,0,14" />
+
+                    <!-- 流程 -->
+                    <StackPanel Grid.Row="2">
+                        <TextBlock Style="{StaticResource DsSectionLabel}" Text="流程" />
+                        <ItemsControl ItemsSource="{Binding Steps}" ItemTemplate="{StaticResource StageCardTemplate}" />
+                    </StackPanel>
+
+                    <Border Grid.Row="4" Style="{StaticResource DsHairline}" Margin="0,14,0,14" />
+
+                    <!--
+                      操作。运行/停止是一对反义动作，放同一行；单步执行放下面一行。
+                      注意这里的高度预算卡得很死：左栏内容是竖排的，多出来的任何一点
+                      高度都会把最后一行顶出面板之外（实测过一次"停止"整个按钮没画出来，
+                      因为溢出的部分不渲染），所以分段间距一律取小值。
+                    -->
+                    <StackPanel Grid.Row="5">
+                        <TextBlock Style="{StaticResource DsSectionLabel}" Text="操作" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="86" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="一键执行：清理 → 构建 → 启动"
+                                    Style="{StaticResource DsButtonPrimary}"
+                                    Height="36"
+                                    IsEnabled="{Binding CanOperate}"
+                                    Command="{Binding RunPipelineCommand}" />
+                            <Button Grid.Column="2" Content="停止"
+                                    Style="{StaticResource DsButtonDanger}"
+                                    Height="36"
+                                    IsEnabled="{Binding CanStop}"
+                                    Command="{Binding StopCommand}" />
+                        </Grid>
+
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="清理" Style="{StaticResource DsButtonSecondary}"
+                                    Height="32" IsEnabled="{Binding CanOperate}" Command="{Binding RunCleanCommand}" />
+                            <Button Grid.Column="2" Content="构建" Style="{StaticResource DsButtonSecondary}"
+                                    Height="32" IsEnabled="{Binding CanOperate}" Command="{Binding RunBuildCommand}" />
+                            <Button Grid.Column="4" Content="启动" Style="{StaticResource DsButtonSecondary}"
+                                    Height="32" IsEnabled="{Binding CanOperate}" Command="{Binding RunStartCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ── 右栏：深色控制台 ───────────────────────────────────────── -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="2,0,2,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!--
+                      日志工具条。这一行是"固定宽度内容"，没有可压缩的空间：
+                      它比窗口窄一点就会把最右边的按钮顶出可视区（实测 1040 宽时
+                      「导出」整颗丢失）。所以标题不放副标题、间距一律取小值，
+                      把这一行的宽度控制在右下角最窄窗口也放得下。
+                    -->
+                    <TextBlock Grid.Column="0" Text="运行日志" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{StaticResource DsTextBrush}" VerticalAlignment="Center" />
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <hc:SearchBar Width="190"
+                                      IsRealTime="True"
+                                      Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                      hc:InfoElement.Placeholder="过滤日志" />
+                        <CheckBox Content="自动滚动" Margin="12,0,0,0" VerticalAlignment="Center"
+                                  IsChecked="{Binding AutoScroll}" />
+                        <Button Content="清空" Style="{StaticResource DsButtonSecondary}" Height="30"
+                                Margin="12,0,0,0" Command="{Binding ClearLogsCommand}" />
+                        <Button Content="复制" Style="{StaticResource DsButtonSecondary}" Height="30"
+                                Margin="6,0,0,0" Command="{Binding CopyLogsCommand}" />
+                        <Button Content="导出" Style="{StaticResource DsButtonSecondary}" Height="30"
+                                Margin="6,0,0,0" Command="{Binding ExportLogsCommand}" />
+                    </StackPanel>
+                </Grid>
+
+                <Border Grid.Row="1"
+                        Background="{StaticResource DsConsoleBrush}"
+                        BorderBrush="{StaticResource DsConsoleBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        SnapsToDevicePixels="True">
+                    <ListBox x:Name="LogList"
+                             ItemsSource="{Binding LogView}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0,6"
+                             Foreground="{StaticResource DsConsoleTextBrush}"
+                             ItemContainerStyle="{StaticResource DsLogRowStyle}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling">
+                        <ListBox.Resources>
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource DsConsoleScrollBar}" />
+                        </ListBox.Resources>
+
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="60" />
+                                        <ColumnDefinition Width="84" />
+                                        <ColumnDefinition Width="50" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Style="{StaticResource LogLineText}"
+                                               Foreground="{StaticResource DsConsoleFaintBrush}"
+                                               Text="{Binding TimeText}" />
+
+                                    <TextBlock Grid.Column="1"
+                                               Style="{StaticResource LogLineText}"
+                                               Foreground="{StaticResource DsConsoleFaintBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Text="{Binding SourceText}" />
+
+                                    <TextBlock Grid.Column="2" Text="{Binding LevelText}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource LogLineText}">
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                <Setter Property="Foreground" Value="{StaticResource DsConsoleDimBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Level}" Value="Info">
+                                                        <Setter Property="Foreground" Value="{StaticResource DsConsoleInfoBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Level}" Value="Warn">
+                                                        <Setter Property="Foreground" Value="{StaticResource DsConsoleWarnBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Level}" Value="Error">
+                                                        <Setter Property="Foreground" Value="{StaticResource DsConsoleErrorBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Level}" Value="System">
+                                                        <Setter Property="Foreground" Value="{StaticResource DsConsoleSystemBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <TextBlock Grid.Column="3" Text="{Binding Message}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource LogLineText}">
+                                                <Setter Property="Foreground" Value="{StaticResource DsConsoleTextBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Level}" Value="Warn">
+                                                        <Setter Property="Foreground" Value="{StaticResource DsConsoleWarnBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Level}" Value="Error">
+                                                        <Setter Property="Foreground" Value="{StaticResource DsConsoleErrorBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Level}" Value="System">
+                                                        <Setter Property="Foreground" Value="{StaticResource DsConsoleSystemBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- ══ 状态条 ═══════════════════════════════════════════════════════ -->
+        <Border Grid.Row="2"
+                Background="{StaticResource DsSurfaceBrush}"
+                BorderBrush="{StaticResource DsBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="20,0">
+            <Grid Height="46">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 状态胶囊：圆点颜色跟着 出错 > 服务运行 > 忙碌 > 空闲 走 -->
+                <Border Grid.Column="0" CornerRadius="14" Padding="11,5" VerticalAlignment="Center">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{StaticResource DsNeutralSoftBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource DsAccentSoftBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsServerRunning}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource DsSuccessSoftBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource DsDangerSoftBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7" Height="7" VerticalAlignment="Center">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{StaticResource DsTextFaintBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource DsAccentLineBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsServerRunning}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource DsSuccessBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource DsDangerBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+
+                        <hc:Tag Content="{Binding StatusText}"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="0"
+                                Margin="8,0,0,0"
+                                FontSize="12"
+                                VerticalAlignment="Center"
+                                Foreground="{StaticResource DsTextBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Grid.Column="1" />
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <TextBlock Text="服务地址" FontSize="11.5" VerticalAlignment="Center"
+                               Foreground="{StaticResource DsTextMutedBrush}" />
+                    <TextBlock Text="{Binding ServerUrl}" Style="{StaticResource DsMonoText}"
+                               Margin="7,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <TextBlock Grid.Column="3"
+                           Text="{Binding LogFilePath}"
+                           Style="{StaticResource DsMonoText}"
+                           MaxWidth="300"
+                           Margin="20,0,0,0"
+                           VerticalAlignment="Center"
+                           ToolTip="{Binding LogFilePath}" />
+
+                <hc:CircleProgressBar Grid.Column="4"
+                                      Width="18"
+                                      Height="18"
+                                      Margin="16,0,0,0"
+                                      IsIndeterminate="True"
+                                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+            </Grid>
+        </Border>
+    </Grid>
+</hc:Window>

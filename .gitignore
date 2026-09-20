@@ -1,0 +1,35 @@
+# ============ .NET 构建产物 ============
+**/bin/
+**/obj/
+*.user
+
+# ============ 发布输出（通过 GitHub Release/Tag 发布，不进版本库） ============
+**/publish/
+
+# ============ 测试输出 ============
+**/TestResults/
+*.trx
+*.coverage
+
+# ============ UI 冒烟测试临时目录与临时假仓库 ============
+.uitest/
+
+# ============ 本机 AI 助手记忆（只在本机用，不随仓库发布） ============
+/CLAUDE.md
+
+# ============ IDE / 编辑器 ============
+.vs/
+.idea/
+.vscode/
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ============ 运行时临时文件（日志本体写在 %AppData%\DshLauncher\logs） ============
+*.tmp
+*.log
+
+# ============ 系统文件 ============
+Thumbs.db
+Desktop.ini
+.DS_Store
